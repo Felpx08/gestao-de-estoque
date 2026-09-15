@@ -53,11 +53,11 @@ O servidor sobe em `http://localhost:3000`. Acesse `http://localhost:3000/login.
 
 ## Usuários de teste (criados pelo script.sql)
 
-| E-mail                          | Senha  |
+| E-mail                           | Senha  |
 |----------------------------------|--------|
-| ana.souza@embalatech.com         | 123456 |
-| carlos.lima@embalatech.com       | 123456 |
-| beatriz.alves@embalatech.com     | 123456 |
+| felipe.silva@embalatech.com      | 123456 |
+| felipe.santos@embalatech.com     | 123456 |
+| felp.silva@embalatech.com        | 123456 |
 
 ## Principais funcionalidades
 
