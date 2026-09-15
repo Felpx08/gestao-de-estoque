@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestão de Estoque — Sistema de Gestão de Estoque</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topo">
+    <div class="marca">Almoxarifado</div>
+    <div class="usuario-info">
+      <span>Olá, <span class="nome" id="nomeUsuario">—</span></span>
+      <button class="btn btn-secundario btn-pequeno" id="btnSair">Sair</button>
+    </div>
+  </div>
+
+  <div class="conteudo">
+    <div class="cabecalho-pagina">
+      <div>
+        <a href="principal.html" style="font-size:13px; color: #b1b1b1;;">&larr; Voltar à tela principal</a>
+        <h2>Gestão de Estoque</h2>
+      </div>
+      <button class="btn btn-sucesso" id="btnNovaMovimentacao">+ Nova Movimentação</button>
+    </div>
+
+    <div class="alerta-caixa aviso" id="alertaEstoqueMinimo"></div>   
+
+    <h3 style="color:#b1adad;">Produtos (ordem alfabética)</h3>
+    <div class="tabela-wrapper" style="margin-bottom:28px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Categoria</th>
+            <th>Qtd. Atual</th>
+            <th>Estoque Mín.</th>
+            <th>Situação</th>
+          </tr>
+        </thead>
+        <tbody id="corpoTabelaEstoque"></tbody>
+      </table>
+    </div>
+
+    <h3 style="color:#b1adad;">Histórico de Movimentações</h3>
+    <div class="tabela-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Produto</th>
+            <th>Tipo</th>
+            <th>Quantidade</th>
+            <th>Responsável</th>
+            <th>Observação</th>
+          </tr>
+        </thead>
+        <tbody id="corpoTabelaMovimentacoes"></tbody>
+      </table>
+      <div class="vazio" id="movimentacoesVazio" style="display:none;">Nenhuma movimentação registrada.</div>
+    </div>
+  </div>
+
+  <!-- Modal de nova movimentação -->
+  <div class="overlay" id="overlayModal">
+    <div class="modal">
+      <h3>Nova Movimentação de Estoque</h3>
+      <div class="alerta-caixa erro" id="alertaFormulario"></div>
+
+      <form id="formMovimentacao">
+        <div class="campo">
+          <label for="produto_id">Produto *</label>
+          <select id="produto_id" required></select>
+        </div>
+
+        <div class="campo">
+          <label>Tipo de movimentação *</label>
+          <div style="display:flex; gap:20px; margin-top:4px;">
+            <label style="display:flex; align-items:center; gap:6px; font-weight:400;">
+              <input type="radio" name="tipo" value="ENTRADA" checked> Entrada
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:400;">
+              <input type="radio" name="tipo" value="SAIDA"> Saída
+            </label>
+          </div>
+        </div>
+
+        <div class="form-linha">
+          <div class="campo">
+            <label for="quantidade">Quantidade *</label>
+            <input type="number" id="quantidade" min="1" required>
+          </div>
+          <div class="campo">
+            <label for="data_movimentacao">Data da movimentação *</label>
+            <input type="date" id="data_movimentacao" required>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="observacao">Observação</label>
+          <input type="text" id="observacao" placeholder="Ex: NF, fornecedor, linha de produção...">
+        </div>
+
+        <div class="acoes-modal">
+          <button type="button" class="btn btn-secundario" id="btnCancelarModal">Cancelar</button>
+          <button type="submit" class="btn btn-sucesso">Registrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    exigirAutenticacao();
+    document.getElementById('nomeUsuario').textContent = obterUsuario().nome;
+    document.getElementById('btnSair').addEventListener('click', fazerLogout);
+
+    function formatarNumero(valor) {
+      return new Intl.NumberFormat('pt-BR').format(valor);
+    }
+    function formatarData(dataStr) {
+      const d = new Date(dataStr);
+      if (isNaN(d.getTime())) return dataStr;
+      return d.toLocaleDateString('pt-BR');
+    }
+
+    async function carregarListaSelectProdutos() {
+      const { dados } = await chamarApi('/estoque/produtos');
+      const select = document.getElementById('produto_id');
+      select.innerHTML = (dados.produtos || [])
+        .map(p => `<option value="${p.id}">${p.nome} (disponível: ${formatarNumero(p.quantidade_atual)})</option>`)
+        .join('');
+    }
+
+    async function carregarProdutosOrdenados() {
+      const { dados } = await chamarApi('/estoque/produtos');
+      const produtos = dados.produtos || [];
+      const corpo = document.getElementById('corpoTabelaEstoque');
+
+      corpo.innerHTML = produtos.map(p => {
+        const abaixoMinimo = p.quantidade_atual < p.estoque_minimo;
+        return `
+          <tr>
+            <td>${p.nome}</td>
+            <td>${p.categoria_nome}</td>
+            <td>${formatarNumero(p.quantidade_atual)}</td>
+            <td>${formatarNumero(p.estoque_minimo)}</td>
+            <td><span class="badge ${abaixoMinimo ? 'abaixo-minimo' : 'ok'}">${abaixoMinimo ? 'Abaixo do mínimo' : 'Normal'}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function carregarMovimentacoes() {
+      const { dados } = await chamarApi('/estoque/movimentacoes');
+      const movimentacoes = dados.movimentacoes || [];
+      const corpo = document.getElementById('corpoTabelaMovimentacoes');
+      const vazio = document.getElementById('movimentacoesVazio');
+
+      if (movimentacoes.length === 0) {
+        corpo.innerHTML = '';
+        vazio.style.display = 'block';
+        return;
+      }
+      vazio.style.display = 'none';
+
+      corpo.innerHTML = movimentacoes.map(m => `
+        <tr>
+          <td>${formatarData(m.data_movimentacao)}</td>
+          <td>${m.produto_nome}</td>
+          <td><span class="badge ${m.tipo === 'ENTRADA' ? 'entrada' : 'saida'}">${m.tipo === 'ENTRADA' ? 'Entrada' : 'Saída'}</span></td>
+          <td>${formatarNumero(m.quantidade)}</td>
+          <td>${m.usuario_nome}</td>
+          <td>${m.observacao || '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function atualizarTudo() {
+      await Promise.all([carregarProdutosOrdenados(), carregarMovimentacoes(), carregarListaSelectProdutos()]);
+    }
+
+    // ---------- Modal ----------
+    const overlayModal = document.getElementById('overlayModal');
+    const formMovimentacao = document.getElementById('formMovimentacao');
+    const alertaFormulario = document.getElementById('alertaFormulario');
+
+    document.getElementById('btnNovaMovimentacao').addEventListener('click', async () => {
+      formMovimentacao.reset();
+      alertaFormulario.classList.remove('visivel');
+      document.getElementById('data_movimentacao').valueAsDate = new Date();
+      await carregarListaSelectProdutos();
+      overlayModal.classList.add('visivel');
+    });
+
+    document.getElementById('btnCancelarModal').addEventListener('click', () => {
+      overlayModal.classList.remove('visivel');
+    });
+
+    formMovimentacao.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      alertaFormulario.classList.remove('visivel');
+
+      const corpo = {
+        produto_id: document.getElementById('produto_id').value,
+        tipo: document.querySelector('input[name="tipo"]:checked').value,
+        quantidade: document.getElementById('quantidade').value,
+        data_movimentacao: document.getElementById('data_movimentacao').value,
+        observacao: document.getElementById('observacao').value
+      };
+
+      const { ok, dados } = await chamarApi('/estoque/movimentacoes', { method: 'POST', body: JSON.stringify(corpo) });
+
+      if (!ok) {
+        alertaFormulario.textContent = (dados.erros || [dados.mensagem]).join(' ');
+        alertaFormulario.classList.add('visivel');
+        return;
+      }
+
+      overlayModal.classList.remove('visivel');
+
+      const alertaEstoque = document.getElementById('alertaEstoqueMinimo');
+      if (dados.alerta) {
+        alertaEstoque.textContent = '⚠️ ' + dados.mensagem;
+        alertaEstoque.classList.add('visivel');
+      } else {
+        alertaEstoque.classList.remove('visivel');
+      }
+
+      await atualizarTudo();
+    });
+
+    // ---------- Inicialização ----------
+    atualizarTudo();
+  </script>
+</body>
+</html>

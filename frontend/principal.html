@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Início — Sistema de Gestão de Estoque</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topo">
+    <div class="marca"> Almoxarifado</div>
+    <div class="usuario-info">
+      <span>Olá, <span class="nome" id="nomeUsuario">—</span></span>
+      <button class="btn btn-secundario btn-pequeno" id="btnSair">Sair</button>
+    </div>
+  </div>
+
+  <div class="conteudo">
+    <div class="cabecalho-pagina">
+      <h2>Painel Principal</h2>
+    </div>
+    <p>Bem-vindo(a) ao sistema de gestão de estoque da indústria de embalagens. Selecione uma das opções abaixo:</p>
+
+    <div class="grid-cards">
+      <a href="produtos.html" class="card-menu">
+        <div class="icone"></div>
+        <h3>Cadastro de Produto</h3>
+        <p>Cadastrar, editar, buscar e excluir produtos do estoque.</p>
+      </a>
+      <a href="estoque.html" class="card-menu">
+        <div class="icone"></div>
+        <h3>Gestão de Estoque</h3>
+        <p>Registrar entradas e saídas e acompanhar alertas de estoque mínimo.</p>
+      </a>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    exigirAutenticacao();
+    const usuario = obterUsuario();
+    document.getElementById('nomeUsuario').textContent = usuario.nome;
+
+    document.getElementById('btnSair').addEventListener('click', fazerLogout);
+  </script>
+</body>
+</html>

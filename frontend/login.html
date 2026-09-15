@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Sistema de Gestão de Estoque</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-card">
+      <h1>Almoxarifado</h1>
+      <p class="subtitulo">Sistema de Gestão de Estoque</p>
+
+      <div id="erroLogin" class="erro-msg"></div>
+
+      <form id="formLogin">
+        <div class="campo">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" name="email" placeholder="seu.email@empresa.com" required>
+        </div>
+        <div class="campo">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" name="senha" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-full">Entrar</button>
+      </form>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Se já existe sessão ativa, vai direto para a tela principal
+    if (obterToken() && obterUsuario()) {
+      window.location.href = 'principal.html';
+    }
+
+    const form = document.getElementById('formLogin');
+    const erroDiv = document.getElementById('erroLogin');
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      erroDiv.classList.remove('visivel');
+      erroDiv.textContent = '';
+
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value;
+
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, senha })
+        });
+        const dados = await resp.json();
+
+        if (!resp.ok || !dados.sucesso) {
+          // Requisito 4.1: informar o motivo da falha e retornar à tela de login
+          erroDiv.textContent = dados.mensagem || 'Falha na autenticação. Verifique suas credenciais.';
+          erroDiv.classList.add('visivel');
+          document.getElementById('senha').value = '';
+          return;
+        }
+
+        salvarSessao(dados.token, dados.usuario);
+        window.location.href = 'principal.html';
+      } catch (err) {
+        erroDiv.textContent = 'Não foi possível conectar ao servidor. Tente novamente.';
+        erroDiv.classList.add('visivel');
+      }
+    });
+  </script>
+</body>
+</html>

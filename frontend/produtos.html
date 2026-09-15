@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadastro de Produto — Sistema de Gestão de Estoque</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topo">
+    <div class="marca"> Almoxarifado</div>
+    <div class="usuario-info">
+      <span>Olá, <span class="nome" id="nomeUsuario">—</span></span>
+      <button class="btn btn-secundario btn-pequeno" id="btnSair">Sair</button>
+    </div>
+  </div>
+
+  <div class="conteudo">
+    <div class="cabecalho-pagina">
+      <div>
+        <a href="principal.html" style="font-size:13px; color:#9ea0a1;">&larr; Voltar à tela principal</a>
+        <h2>Cadastro de Produto</h2>
+      </div>
+      <button class="btn btn-sucesso" id="btnNovoProduto">+ Novo Produto</button>
+    </div>
+
+    <form class="busca-form" id="formBusca">
+      <input type="text" id="campoBusca" placeholder="Buscar por nome, categoria ou descrição...">
+      <button type="submit" class="btn">Buscar</button>
+      <button type="button" class="btn btn-secundario" id="btnLimparBusca">Limpar</button>
+    </form>
+
+    <div class="tabela-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Categoria</th>
+            <th>Qtd. Atual</th>
+            <th>Estoque Mín.</th>
+            <th>Unid.</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="corpoTabelaProdutos"></tbody>
+      </table>
+      <div class="vazio" id="tabelaVazia" style="display:none;">Nenhum produto encontrado.</div>
+    </div>
+  </div>
+
+  <!-- Modal de cadastro/edição -->
+  <div class="overlay" id="overlayModal">
+    <div class="modal">
+      <h3 id="tituloModal">Novo Produto</h3>
+      <div class="alerta-caixa erro" id="alertaFormulario"></div>
+
+      <form id="formProduto">
+        <input type="hidden" id="produtoId">
+
+        <div class="campo">
+          <label for="nome">Nome do produto *</label>
+          <input type="text" id="nome" required>
+        </div>
+
+        <div class="form-linha">
+          <div class="campo">
+            <label for="categoria_id">Categoria *</label>
+            <select id="categoria_id" required></select>
+          </div>
+          <div class="campo">
+            <label for="unidade_medida">Unidade de medida</label>
+            <select id="unidade_medida">
+              <option value="UN">UN (unidade)</option>
+              <option value="KG">KG</option>
+              <option value="L">L (litro)</option>
+              <option value="CX">CX (caixa)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="descricao">Descrição</label>
+          <textarea id="descricao" rows="2"></textarea>
+        </div>
+
+        <div class="form-linha">
+          <div class="campo">
+            <label for="gramatura">Gramatura (ex.: caixas de papelão)</label>
+            <input type="text" id="gramatura" placeholder="Ex: 150g/m²">
+          </div>
+          <div class="campo">
+            <label for="dimensoes">Dimensões</label>
+            <input type="text" id="dimensoes" placeholder="Ex: 30x20x15 cm">
+          </div>
+        </div>
+
+        <div class="form-linha">
+          <div class="campo">
+            <label for="capacidade_volumetrica">Capacidade volumétrica (ex.: frascos)</label>
+            <input type="text" id="capacidade_volumetrica" placeholder="Ex: 500ml">
+          </div>
+          <div class="campo">
+            <label for="tipo_tampa">Tipo de tampa</label>
+            <input type="text" id="tipo_tampa" placeholder="Ex: Rosca, Flip-top">
+          </div>
+        </div>
+
+        <div class="form-linha">
+          <div class="campo">
+            <label for="quantidade_atual">Quantidade atual *</label>
+            <input type="number" id="quantidade_atual" min="0" required>
+          </div>
+          <div class="campo">
+            <label for="estoque_minimo">Estoque mínimo *</label>
+            <input type="number" id="estoque_minimo" min="0" required>
+          </div>
+        </div>
+
+        <div class="acoes-modal">
+          <button type="button" class="btn btn-secundario" id="btnCancelarModal">Cancelar</button>
+          <button type="submit" class="btn btn-sucesso">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de confirmação de exclusão -->
+  <div class="overlay" id="overlayExclusao">
+    <div class="modal" style="width:380px;">
+      <h3>Confirmar exclusão</h3>
+      <p>Tem certeza que deseja excluir o produto <strong id="nomeProdutoExcluir"></strong>? Esta ação não pode ser desfeita.</p>
+      <div class="acoes-modal">
+        <button type="button" class="btn btn-secundario" id="btnCancelarExclusao">Cancelar</button>
+        <button type="button" class="btn btn-perigo" id="btnConfirmarExclusao">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    exigirAutenticacao();
+    document.getElementById('nomeUsuario').textContent = obterUsuario().nome;
+    document.getElementById('btnSair').addEventListener('click', fazerLogout);
+
+    let categorias = [];
+    let produtoParaExcluir = null;
+
+    async function carregarCategorias() {
+      const { dados } = await chamarApi('/produtos/categorias');
+      categorias = dados.categorias || [];
+      const select = document.getElementById('categoria_id');
+      select.innerHTML = categorias.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+    }
+
+    function formatarNumero(valor) {
+      return new Intl.NumberFormat('pt-BR').format(valor);
+    }
+
+    async function carregarProdutos(termoBusca = '') {
+      const query = termoBusca ? `?busca=${encodeURIComponent(termoBusca)}` : '';
+      const { dados } = await chamarApi('/produtos' + query);
+      const produtos = dados.produtos || [];
+      const corpo = document.getElementById('corpoTabelaProdutos');
+      const vazio = document.getElementById('tabelaVazia');
+
+      if (produtos.length === 0) {
+        corpo.innerHTML = '';
+        vazio.style.display = 'block';
+        return;
+      }
+      vazio.style.display = 'none';
+
+      corpo.innerHTML = produtos.map(p => `
+        <tr>
+          <td>${p.nome}</td>
+          <td>${p.categoria_nome}</td>
+          <td>${formatarNumero(p.quantidade_atual)}</td>
+          <td>${formatarNumero(p.estoque_minimo)}</td>
+          <td>${p.unidade_medida}</td>
+          <td class="acoes-linha">
+            <button class="btn btn-pequeno" onclick="abrirEdicao(${p.id})">Editar</button>
+            <button class="btn btn-pequeno btn-perigo" onclick="abrirExclusao(${p.id}, '${p.nome.replace(/'/g, "\\'")}')">Excluir</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ---------- Busca ----------
+    document.getElementById('formBusca').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      carregarProdutos(document.getElementById('campoBusca').value.trim());
+    });
+    document.getElementById('btnLimparBusca').addEventListener('click', () => {
+      document.getElementById('campoBusca').value = '';
+      carregarProdutos();
+    });
+
+    // ---------- Modal cadastro/edição ----------
+    const overlayModal = document.getElementById('overlayModal');
+    const formProduto = document.getElementById('formProduto');
+    const alertaFormulario = document.getElementById('alertaFormulario');
+
+    function limparFormulario() {
+      formProduto.reset();
+      document.getElementById('produtoId').value = '';
+      alertaFormulario.classList.remove('visivel');
+      alertaFormulario.textContent = '';
+    }
+
+    document.getElementById('btnNovoProduto').addEventListener('click', () => {
+      limparFormulario();
+      document.getElementById('tituloModal').textContent = 'Novo Produto';
+      overlayModal.classList.add('visivel');
+    });
+
+    document.getElementById('btnCancelarModal').addEventListener('click', () => {
+      overlayModal.classList.remove('visivel');
+    });
+
+    async function abrirEdicao(id) {
+      const { dados } = await chamarApi('/produtos');
+      const produto = (dados.produtos || []).find(p => p.id === id);
+      if (!produto) return;
+
+      limparFormulario();
+      document.getElementById('tituloModal').textContent = 'Editar Produto';
+      document.getElementById('produtoId').value = produto.id;
+      document.getElementById('nome').value = produto.nome;
+      document.getElementById('categoria_id').value = produto.categoria_id;
+      document.getElementById('unidade_medida').value = produto.unidade_medida;
+      document.getElementById('descricao').value = produto.descricao || '';
+      document.getElementById('gramatura').value = produto.gramatura || '';
+      document.getElementById('dimensoes').value = produto.dimensoes || '';
+      document.getElementById('capacidade_volumetrica').value = produto.capacidade_volumetrica || '';
+      document.getElementById('tipo_tampa').value = produto.tipo_tampa || '';
+      document.getElementById('quantidade_atual').value = produto.quantidade_atual;
+      document.getElementById('estoque_minimo').value = produto.estoque_minimo;
+
+      overlayModal.classList.add('visivel');
+    }
+
+    formProduto.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      alertaFormulario.classList.remove('visivel');
+
+      const id = document.getElementById('produtoId').value;
+      const corpo = {
+        nome: document.getElementById('nome').value,
+        categoria_id: document.getElementById('categoria_id').value,
+        unidade_medida: document.getElementById('unidade_medida').value,
+        descricao: document.getElementById('descricao').value,
+        gramatura: document.getElementById('gramatura').value,
+        dimensoes: document.getElementById('dimensoes').value,
+        capacidade_volumetrica: document.getElementById('capacidade_volumetrica').value,
+        tipo_tampa: document.getElementById('tipo_tampa').value,
+        quantidade_atual: document.getElementById('quantidade_atual').value,
+        estoque_minimo: document.getElementById('estoque_minimo').value
+      };
+
+      const caminho = id ? `/produtos/${id}` : '/produtos';
+      const metodo = id ? 'PUT' : 'POST';
+
+      const { ok, dados } = await chamarApi(caminho, { method: metodo, body: JSON.stringify(corpo) });
+
+      if (!ok) {
+        // Requisito 6.1.6: exibir alertas de validação ao usuário
+        alertaFormulario.textContent = (dados.erros || [dados.mensagem]).join(' ');
+        alertaFormulario.classList.add('visivel');
+        return;
+      }
+
+      overlayModal.classList.remove('visivel');
+      carregarProdutos(document.getElementById('campoBusca').value.trim());
+    });
+
+    // ---------- Exclusão ----------
+    const overlayExclusao = document.getElementById('overlayExclusao');
+
+    function abrirExclusao(id, nome) {
+      produtoParaExcluir = id;
+      document.getElementById('nomeProdutoExcluir').textContent = nome;
+      overlayExclusao.classList.add('visivel');
+    }
+
+    document.getElementById('btnCancelarExclusao').addEventListener('click', () => {
+      overlayExclusao.classList.remove('visivel');
+      produtoParaExcluir = null;
+    });
+
+    document.getElementById('btnConfirmarExclusao').addEventListener('click', async () => {
+      if (!produtoParaExcluir) return;
+      await chamarApi(`/produtos/${produtoParaExcluir}`, { method: 'DELETE' });
+      overlayExclusao.classList.remove('visivel');
+      produtoParaExcluir = null;
+      carregarProdutos(document.getElementById('campoBusca').value.trim());
+    });
+
+    // ---------- Inicialização ----------
+    (async function iniciar() {
+      await carregarCategorias();
+      await carregarProdutos();
+    })();
+  </script>
+</body>
+</html>
