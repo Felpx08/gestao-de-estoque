@@ -35,7 +35,8 @@ Atividade prática: desenvolvimento de um sistema web para controle de entrada e
 Pré-requisito: [Node.js](https://nodejs.org/) versão 18 ou superior instalado.
 
 ```bash
-# 1. Entrar na pasta do backend
+# 1. Entrar na pasta do 
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 cd sistema/backend
 
 # 2. Instalar as dependências
